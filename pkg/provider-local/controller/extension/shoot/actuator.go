@@ -22,6 +22,7 @@ import (
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	kubernetesclient "github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/controllerutils"
+	"github.com/gardener/gardener/pkg/extensions"
 	"github.com/gardener/gardener/pkg/utils/flow"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
 	kubernetesutils "github.com/gardener/gardener/pkg/utils/kubernetes"
@@ -113,7 +114,7 @@ func (a *actuator) Reconcile(ctx context.Context, _ logr.Logger, ex *extensionsv
 }
 
 // Delete the extension resource.
-func (a *actuator) Delete(ctx context.Context, _ logr.Logger, ex *extensionsv1alpha1.Extension) error {
+func (a *actuator) Delete(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) error {
 	namespace := ex.GetNamespace()
 	twoMinutes := 2 * time.Minute
 
@@ -124,15 +125,28 @@ func (a *actuator) Delete(ctx context.Context, _ logr.Logger, ex *extensionsv1al
 		return err
 	}
 
-	return managedresources.WaitUntilDeleted(timeoutShootCtx, a.client, namespace, ManagedResourceNamesShoot)
+	if err := managedresources.WaitUntilDeleted(timeoutShootCtx, a.client, namespace, ManagedResourceNamesShoot); err != nil {
+		return err
+	}
+
+	shoot, err := extensions.GetShoot(ctx, a.client, namespace)
+	if err != nil {
+		return err
+	}
+
+	if kubernetesutils.HasMetaDataAnnotation(shoot, AnnotationTestForceDeleteShoot, "true") {
+		log.Info("Deleting all test NetworkPolicies in namespace", "namespace", ex.Namespace)
+		return flow.Parallel(
+			utilclient.ForceDeleteObjects(a.client, ex.Namespace, &networkingv1.NetworkPolicyList{}, client.MatchingLabels(getLabels())),
+		)(ctx)
+	}
+
+	return nil
 }
 
 // ForceDelete force deletes the extension resource.
 func (a *actuator) ForceDelete(ctx context.Context, log logr.Logger, ex *extensionsv1alpha1.Extension) error {
-	log.Info("Deleting all test NetworkPolicies in namespace", "namespace", ex.Namespace)
-	return flow.Parallel(
-		utilclient.ForceDeleteObjects(a.client, ex.Namespace, &networkingv1.NetworkPolicyList{}, client.MatchingLabels(getLabels())),
-	)(ctx)
+	return a.Delete(ctx, log, ex)
 }
 
 // Migrate the extension resource.
