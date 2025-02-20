@@ -129,16 +129,18 @@ func (a *actuator) Delete(ctx context.Context, log logr.Logger, ex *extensionsv1
 		return err
 	}
 
-	shoot, err := extensions.GetShoot(ctx, a.client, namespace)
-	if err != nil {
-		return err
-	}
+	if ex.Spec.Class == nil || *ex.Spec.Class == extensionsv1alpha1.ExtensionClassShoot {
+		shoot, err := extensions.GetShoot(ctx, a.client, namespace)
+		if err != nil {
+			return err
+		}
 
-	if kubernetesutils.HasMetaDataAnnotation(shoot, AnnotationTestForceDeleteShoot, "true") {
-		log.Info("Deleting all test NetworkPolicies in namespace", "namespace", ex.Namespace)
-		return flow.Parallel(
-			utilclient.ForceDeleteObjects(a.client, ex.Namespace, &networkingv1.NetworkPolicyList{}, client.MatchingLabels(getLabels())),
-		)(ctx)
+		if kubernetesutils.HasMetaDataAnnotation(shoot, AnnotationTestForceDeleteShoot, "true") {
+			log.Info("Deleting all test NetworkPolicies in namespace", "namespace", ex.Namespace)
+			return flow.Parallel(
+				utilclient.ForceDeleteObjects(a.client, ex.Namespace, &networkingv1.NetworkPolicyList{}, client.MatchingLabels(getLabels())),
+			)(ctx)
+		}
 	}
 
 	return nil
