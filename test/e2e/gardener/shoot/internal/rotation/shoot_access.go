@@ -5,7 +5,6 @@
 package rotation
 
 import (
-	"context"
 	"flag"
 	"time"
 
@@ -30,7 +29,7 @@ type ShootAccessVerifier struct {
 }
 
 // Before is called before the rotation is started.
-func (v *ShootAccessVerifier) Before(_ context.Context) {
+func (v *ShootAccessVerifier) Before() {
 	It("Use admin kubeconfig with old CA to access shoot", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
 			shootClient, err := access.CreateShootClientFromAdminKubeconfig(ctx, v.GardenClientSet, v.Shoot)
@@ -86,7 +85,7 @@ func (v *ShootAccessVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gomeg
 func (v *ShootAccessVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
-func (v *ShootAccessVerifier) AfterPrepared(_ context.Context) {
+func (v *ShootAccessVerifier) AfterPrepared() {
 	It("Use admin kubeconfig with old CA to access shoot", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
 			g.Expect(v.clientsBefore.adminKubeconfig.Client().List(ctx, &corev1.NamespaceList{})).To(Succeed())
@@ -160,7 +159,7 @@ func (v *ShootAccessVerifier) AfterPrepared(_ context.Context) {
 func (v *ShootAccessVerifier) ExpectCompletingStatus(_ Gomega) {}
 
 // AfterCompleted is called when the Shoot is in Completed status.
-func (v *ShootAccessVerifier) AfterCompleted(_ context.Context) {
+func (v *ShootAccessVerifier) AfterCompleted() {
 	It("Use admin kubeconfig with old CA to access shoot", func(ctx SpecContext) {
 		Consistently(func(g Gomega) {
 			g.Expect(v.clientsBefore.adminKubeconfig.Client().List(ctx, &corev1.NamespaceList{})).NotTo(Succeed())

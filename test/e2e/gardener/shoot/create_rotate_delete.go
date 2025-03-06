@@ -6,8 +6,6 @@ package shoot
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -33,24 +31,8 @@ import (
 	rotationutils "github.com/gardener/gardener/test/utils/rotation"
 )
 
-func testCredentialRotation(s *ShootContext, shootVerifiers rotationutils.Verifiers, utilsverifiers rotationutils.Verifiers, startRotationAnnotation, completeRotationAnnotation string) {
-	// the verifier interface requires that we pass a context to some of the verifier functions
-	// this is not needed anymore for refactored tests as these use the SpecContext supplied by the "It" statement
-	// Also we cannot pass a nil as the context argument as this makes the linter unhappy :(
-	// TODO(Wieneo): Remove context argument from verifier functions / interface once all verifiers got refactored
-
-	// shoot verifiers are dedicated verifiers for this test and were already refactored to separate "It" statements
-	// we can just execute the verifier function
-	shootVerifiers.Before(context.TODO())
-
-	// utils verifiers are shared verifiers which still use separate "By" statements for structuring tests and expect to be executed within an "It" statement
-	// This is a problem as we removed the "top-level" "It" statements during the refactoring of this test
-	// Until all verifiers are refactored, we need to instantiate separate "It" statements for all shared verifiers to allow for assertions
-	for _, k := range utilsverifiers {
-		It(fmt.Sprintf("Verify before for %s", reflect.TypeOf(k).String()), func(ctx SpecContext) {
-			k.Before(ctx)
-		}, SpecTimeout(5*time.Minute))
-	}
+func testCredentialRotation(s *ShootContext, v rotationutils.Verifiers, startRotationAnnotation, completeRotationAnnotation string) {
+	v.Before()
 
 	if startRotationAnnotation != "" {
 		ItShouldAnnotateShoot(s, map[string]string{
@@ -62,24 +44,18 @@ func testCredentialRotation(s *ShootContext, shootVerifiers rotationutils.Verifi
 		It("Rotation in preparing status", func(ctx SpecContext) {
 			Eventually(ctx, func(g Gomega) {
 				g.Expect(s.GardenClient.Get(ctx, client.ObjectKeyFromObject(s.Shoot), s.Shoot)).To(Succeed())
-				shootVerifiers.ExpectPreparingStatus(g)
-				utilsverifiers.ExpectPreparingStatus(g)
+				v.ExpectPreparingStatus(g)
 			}).Should(Succeed())
 		}, SpecTimeout(time.Minute))
 
 		ItShouldWaitForShootToBeReconciledAndHealthy(s)
-		shootVerifiers.AfterPrepared(context.TODO())
-		for _, k := range utilsverifiers {
-			It(fmt.Sprintf("Verify after prepared for %s", reflect.TypeOf(k).String()), func(ctx SpecContext) {
-				k.AfterPrepared(ctx)
-			})
-		}
+		v.AfterPrepared()
 	}
 
-	testCredentialRotationComplete(s, shootVerifiers, utilsverifiers, completeRotationAnnotation)
+	testCredentialRotationComplete(s, v, completeRotationAnnotation)
 }
 
-func testCredentialRotationComplete(s *ShootContext, shootVerifiers rotationutils.Verifiers, utilsverifiers rotationutils.Verifiers, completeRotationAnnotation string) {
+func testCredentialRotationComplete(s *ShootContext, v rotationutils.Verifiers, completeRotationAnnotation string) {
 	if completeRotationAnnotation != "" {
 		ItShouldAnnotateShoot(s, map[string]string{
 			v1beta1constants.GardenerOperation: completeRotationAnnotation,
@@ -90,38 +66,20 @@ func testCredentialRotationComplete(s *ShootContext, shootVerifiers rotationutil
 		It("Rotation in completing status", func(ctx SpecContext) {
 			Eventually(ctx, func(g Gomega) {
 				g.Expect(s.GardenClient.Get(ctx, client.ObjectKeyFromObject(s.Shoot), s.Shoot)).To(Succeed())
-				shootVerifiers.ExpectCompletingStatus(g)
-				utilsverifiers.ExpectCompletingStatus(g)
+				v.ExpectCompletingStatus(g)
 			}).Should(Succeed())
 		}, SpecTimeout(time.Minute))
 
 		ItShouldWaitForShootToBeReconciledAndHealthy(s)
 
-		shootVerifiers.AfterCompleted(context.TODO())
-		for _, k := range utilsverifiers {
-			It(fmt.Sprintf("Verify after completed for %s", reflect.TypeOf(k).String()), func(ctx SpecContext) {
-				k.AfterCompleted(ctx)
-			})
-		}
+		v.AfterCompleted()
 	}
 
-	shootVerifiers.Cleanup(context.TODO())
-	for _, k := range utilsverifiers {
-		if cleanup, ok := k.(rotationutils.CleanupVerifier); ok {
-			It(fmt.Sprintf("Cleanup for %s", reflect.TypeOf(k).String()), func(ctx SpecContext) {
-				cleanup.Cleanup(ctx)
-			})
-		}
-	}
+	v.Cleanup()
 }
 
-func testCredentialRotationWithoutWorkersRollout(s *ShootContext, shootVerifiers rotationutils.Verifiers, utilsverifiers rotationutils.Verifiers) {
-	shootVerifiers.Before(context.TODO())
-	for _, k := range utilsverifiers {
-		It(fmt.Sprintf("Verify before for %s", reflect.TypeOf(k).String()), func(ctx SpecContext) {
-			k.Before(ctx)
-		}, SpecTimeout(5*time.Minute))
-	}
+func testCredentialRotationWithoutWorkersRollout(s *ShootContext, v rotationutils.Verifiers) {
+	v.Before()
 
 	beforeStartMachinePodNames := sets.New[string]()
 
@@ -145,8 +103,7 @@ func testCredentialRotationWithoutWorkersRollout(s *ShootContext, shootVerifiers
 
 	It("Rotation in preparing without workers rollout status", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
-			shootVerifiers.ExpectPreparingWithoutWorkersRolloutStatus(g)
-			utilsverifiers.ExpectPreparingWithoutWorkersRolloutStatus(g)
+			v.ExpectPreparingWithoutWorkersRolloutStatus(g)
 		}).Should(Succeed())
 	}, SpecTimeout(time.Minute))
 
@@ -154,8 +111,7 @@ func testCredentialRotationWithoutWorkersRollout(s *ShootContext, shootVerifiers
 
 	It("Ensure workers were not rolled out", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
-			shootVerifiers.ExpectWaitingForWorkersRolloutStatus(g)
-			utilsverifiers.ExpectWaitingForWorkersRolloutStatus(g)
+			v.ExpectWaitingForWorkersRolloutStatus(g)
 		}).Should(Succeed())
 	}, SpecTimeout(time.Minute))
 
@@ -231,14 +187,9 @@ func testCredentialRotationWithoutWorkersRollout(s *ShootContext, shootVerifiers
 		Expect(s.Shoot.Status.Credentials.Rotation.ServiceAccountKey.Phase).To(Equal(gardencorev1beta1.RotationPrepared))
 	})
 
-	shootVerifiers.AfterPrepared(context.TODO())
-	for _, k := range utilsverifiers {
-		It(fmt.Sprintf("Verify after prepared for %s", reflect.TypeOf(k).String()), func(ctx SpecContext) {
-			k.AfterPrepared(ctx)
-		}, SpecTimeout(5*time.Minute))
-	}
+	v.AfterPrepared()
 
-	testCredentialRotationComplete(s, shootVerifiers, utilsverifiers, v1beta1constants.OperationRotateCredentialsComplete)
+	testCredentialRotationComplete(s, v, v1beta1constants.OperationRotateCredentialsComplete)
 }
 
 func itShouldEventuallyNotHaveOperationAnnotation(s *ShootContext) {
@@ -259,22 +210,13 @@ var _ = Describe("Shoot Tests", Label("Shoot", "default"), func() {
 
 			// isolated test for ssh key rotation (does not trigger node rolling update)
 			if !v1beta1helper.IsWorkerless(s.Shoot) && !withoutWorkersRollout {
-				testCredentialRotation(s, rotationutils.Verifiers{&rotation.SSHKeypairVerifier{ShootContext: s}}, nil, v1beta1constants.ShootOperationRotateSSHKeypair, "")
+				testCredentialRotation(s, rotationutils.Verifiers{&rotation.SSHKeypairVerifier{ShootContext: s}}, v1beta1constants.ShootOperationRotateSSHKeypair, "")
 			}
 
-			// because of the ongoing refactoring efforts, we currently have two sorts of verifiers
-			// - refactored verifiers / verifiers dedicated to this test scenario, which use separate It's for structuring the tests
-			// - unrefactored verifiers / shared verifiers, which use "By" statements to structure tests
-			//
-			// until all tests and thereby verifiers are refactored, we need to distinguish how we execute the verifier functions
-			// TODO(Wieneo): Consolidate verifiers once operator e2e tests are refactored
-
-			shootVerifiers := rotationutils.Verifiers{
+			v := rotationutils.Verifiers{
 				// basic verifiers checking secrets
 				&rotation.CAVerifier{ShootContext: s},
 				&rotation.ShootAccessVerifier{ShootContext: s},
-			}
-			utilsVerifiers := rotationutils.Verifiers{
 				&rotationutils.ObservabilityVerifier{
 					GetObservabilitySecretFunc: func(ctx context.Context) (*corev1.Secret, error) {
 						secret := &corev1.Secret{}
@@ -335,14 +277,14 @@ var _ = Describe("Shoot Tests", Label("Shoot", "default"), func() {
 			}
 
 			if !v1beta1helper.IsWorkerless(s.Shoot) && !withoutWorkersRollout {
-				shootVerifiers = append(shootVerifiers, &rotation.SSHKeypairVerifier{ShootContext: s})
+				v = append(v, &rotation.SSHKeypairVerifier{ShootContext: s})
 			}
 
 			if !withoutWorkersRollout {
 				// test rotation for every rotation type
-				testCredentialRotation(s, shootVerifiers, utilsVerifiers, v1beta1constants.OperationRotateCredentialsStart, v1beta1constants.OperationRotateCredentialsComplete)
+				testCredentialRotation(s, v, v1beta1constants.OperationRotateCredentialsStart, v1beta1constants.OperationRotateCredentialsComplete)
 			} else {
-				testCredentialRotationWithoutWorkersRollout(s, shootVerifiers, utilsVerifiers)
+				testCredentialRotationWithoutWorkersRollout(s, v)
 			}
 
 			if !v1beta1helper.IsWorkerless(s.Shoot) {

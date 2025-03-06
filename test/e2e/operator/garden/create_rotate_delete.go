@@ -7,7 +7,6 @@ package garden
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -170,14 +169,10 @@ var _ = Describe("Garden Tests", Label("Garden", "default"), func() {
 						},
 					},
 				},
-				&rotation.VirtualGardenAccessVerifier{RuntimeClient: s.GardenClient, Namespace: v1beta1constants.GardenNamespace},
+				&rotation.VirtualGardenAccessVerifier{GardenContext: s, Namespace: v1beta1constants.GardenNamespace},
 			}
 
-			for _, vv := range v {
-				It(fmt.Sprintf("Verify before for %s", reflect.TypeOf(vv).String()), func(ctx SpecContext) {
-					vv.Before(ctx)
-				}, SpecTimeout(5*time.Minute))
-			}
+			v.Before()
 
 			ItShouldAnnotateGarden(s, map[string]string{
 				v1beta1constants.GardenerOperation: v1beta1constants.OperationRotateCredentialsStart,
@@ -194,11 +189,7 @@ var _ = Describe("Garden Tests", Label("Garden", "default"), func() {
 
 			ItShouldWaitForGardenToBeReconciledAndHealthy(s)
 
-			for _, vv := range v {
-				It(fmt.Sprintf("Verify after prepared for %s", reflect.TypeOf(vv).String()), func(ctx SpecContext) {
-					vv.AfterPrepared(ctx)
-				}, SpecTimeout(5*time.Minute))
-			}
+			v.AfterPrepared()
 
 			ItShouldAnnotateGarden(s, map[string]string{
 				v1beta1constants.GardenerOperation: v1beta1constants.OperationRotateCredentialsComplete,
@@ -215,19 +206,8 @@ var _ = Describe("Garden Tests", Label("Garden", "default"), func() {
 
 			ItShouldWaitForGardenToBeReconciledAndHealthy(s)
 
-			for _, vv := range v {
-				It(fmt.Sprintf("Verify after completed for %s", reflect.TypeOf(vv).String()), func(ctx SpecContext) {
-					vv.AfterCompleted(ctx)
-				}, SpecTimeout(5*time.Minute))
-			}
-
-			for _, vv := range v {
-				if cleanup, ok := vv.(rotationutils.CleanupVerifier); ok {
-					It(fmt.Sprintf("Cleanup for %s", reflect.TypeOf(vv).String()), func(ctx SpecContext) {
-						cleanup.Cleanup(ctx)
-					})
-				}
-			}
+			v.AfterCompleted()
+			v.Cleanup()
 
 			ItShouldDeleteGarden(s)
 			ItShouldWaitForGardenToBeDeleted(s)

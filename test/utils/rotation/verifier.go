@@ -5,15 +5,13 @@
 package rotation
 
 import (
-	"context"
-
 	. "github.com/onsi/gomega"
 )
 
 // Verifier does some assertions in different phases of the credentials rotation test.
 type Verifier interface {
 	// Before is called before the rotation is started.
-	Before(ctx context.Context)
+	Before()
 	// ExpectPreparingStatus is called while waiting for the Preparing status.
 	ExpectPreparingStatus(g Gomega)
 	// ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
@@ -21,11 +19,11 @@ type Verifier interface {
 	// ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
 	ExpectWaitingForWorkersRolloutStatus(g Gomega)
 	// AfterPrepared is called when the Shoot is in Prepared status.
-	AfterPrepared(ctx context.Context)
+	AfterPrepared()
 	// ExpectCompletingStatus is called while waiting for the Completing status.
 	ExpectCompletingStatus(g Gomega)
 	// AfterCompleted is called when the Shoot is in Completed status.
-	AfterCompleted(ctx context.Context)
+	AfterCompleted()
 }
 
 // Verifiers combines multiple Verifier instances and calls them sequentially
@@ -35,9 +33,9 @@ var _ Verifier = Verifiers{}
 var _ CleanupVerifier = Verifiers{}
 
 // Before is called before the rotation is started.
-func (v Verifiers) Before(ctx context.Context) {
+func (v Verifiers) Before() {
 	for _, vv := range v {
-		vv.Before(ctx)
+		vv.Before()
 	}
 }
 
@@ -63,9 +61,9 @@ func (v Verifiers) ExpectWaitingForWorkersRolloutStatus(g Gomega) {
 }
 
 // AfterPrepared is called when the Shoot is in Prepared status.
-func (v Verifiers) AfterPrepared(ctx context.Context) {
+func (v Verifiers) AfterPrepared() {
 	for _, vv := range v {
-		vv.AfterPrepared(ctx)
+		vv.AfterPrepared()
 	}
 }
 
@@ -77,23 +75,23 @@ func (v Verifiers) ExpectCompletingStatus(g Gomega) {
 }
 
 // AfterCompleted is called when the Shoot is in Completed status.
-func (v Verifiers) AfterCompleted(ctx context.Context) {
+func (v Verifiers) AfterCompleted() {
 	for _, vv := range v {
-		vv.AfterCompleted(ctx)
+		vv.AfterCompleted()
 	}
 }
 
 // CleanupVerifier can be implemented optionally to run cleanup code.
 type CleanupVerifier interface {
 	// Cleanup is passed to ginkgo.DeferCleanup.
-	Cleanup(ctx context.Context)
+	Cleanup()
 }
 
 // Cleanup is passed to ginkgo.DeferCleanup.
-func (v Verifiers) Cleanup(ctx context.Context) {
+func (v Verifiers) Cleanup() {
 	for _, vv := range v {
 		if cleanup, ok := vv.(CleanupVerifier); ok {
-			cleanup.Cleanup(ctx)
+			cleanup.Cleanup()
 		}
 	}
 }

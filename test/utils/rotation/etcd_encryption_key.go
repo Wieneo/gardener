@@ -47,45 +47,47 @@ func init() {
 }
 
 // Before is called before the rotation is started.
-func (v *ETCDEncryptionKeyVerifier) Before(ctx context.Context) {
-	By("Verify old etcd encryption key secret")
-	Eventually(func(g Gomega) {
-		secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), v.SecretsManagerLabelSelector)
-		g.Expect(err).NotTo(HaveOccurred())
+func (v *ETCDEncryptionKeyVerifier) Before() {
+	It("Verify old etcd encryption key secret", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), v.SecretsManagerLabelSelector)
+			g.Expect(err).NotTo(HaveOccurred())
 
-		grouped := GroupByName(secretList.Items)
-		g.Expect(grouped[v.EncryptionKey]).To(HaveLen(1), "etcd encryption key should get created, but not rotated yet")
-		v.secretsBefore = grouped
-	}).Should(Succeed())
+			grouped := GroupByName(secretList.Items)
+			g.Expect(grouped[v.EncryptionKey]).To(HaveLen(1), "etcd encryption key should get created, but not rotated yet")
+			v.secretsBefore = grouped
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 
-	By("Verify old etcd encryption config secret")
-	Eventually(func(g Gomega) {
-		secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), client.MatchingLabels{v1beta1constants.LabelRole: v.RoleLabelValue})
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(secretList.Items).NotTo(BeEmpty())
-		sort.Sort(sort.Reverse(AgeSorter(secretList.Items)))
+	It("Verify old etcd encryption config secret", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), client.MatchingLabels{v1beta1constants.LabelRole: v.RoleLabelValue})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(secretList.Items).NotTo(BeEmpty())
+			sort.Sort(sort.Reverse(AgeSorter(secretList.Items)))
 
-		encryptionConfiguration := &apiserverconfigv1.EncryptionConfiguration{}
-		g.Expect(runtime.DecodeInto(decoder, secretList.Items[0].Data["encryption-configuration.yaml"], encryptionConfiguration)).To(Succeed())
+			encryptionConfiguration := &apiserverconfigv1.EncryptionConfiguration{}
+			g.Expect(runtime.DecodeInto(decoder, secretList.Items[0].Data["encryption-configuration.yaml"], encryptionConfiguration)).To(Succeed())
 
-		g.Expect(encryptionConfiguration.Resources).To(HaveLen(1))
+			g.Expect(encryptionConfiguration.Resources).To(HaveLen(1))
 
-		g.Expect(encryptionConfiguration.Resources[0].Providers).To(DeepEqual([]apiserverconfigv1.ProviderConfiguration{
-			{
-				AESCBC: &apiserverconfigv1.AESConfiguration{
-					Keys: []apiserverconfigv1.Key{{
-						// old key
-						Name:   string(v.secretsBefore[v.EncryptionKey][0].Data["key"]),
-						Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsBefore[v.EncryptionKey][0]),
-					}},
+			g.Expect(encryptionConfiguration.Resources[0].Providers).To(DeepEqual([]apiserverconfigv1.ProviderConfiguration{
+				{
+					AESCBC: &apiserverconfigv1.AESConfiguration{
+						Keys: []apiserverconfigv1.Key{{
+							// old key
+							Name:   string(v.secretsBefore[v.EncryptionKey][0].Data["key"]),
+							Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsBefore[v.EncryptionKey][0]),
+						}},
+					},
 				},
-			},
-			{
-				// identity is always added
-				Identity: &apiserverconfigv1.IdentityConfiguration{},
-			},
-		}))
-	}).Should(Succeed(), "etcd encryption config should only have old key")
+				{
+					// identity is always added
+					Identity: &apiserverconfigv1.IdentityConfiguration{},
+				},
+			}))
+		}).Should(Succeed(), "etcd encryption config should only have old key")
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
@@ -104,110 +106,118 @@ func (v *ETCDEncryptionKeyVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_
 func (v *ETCDEncryptionKeyVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
-func (v *ETCDEncryptionKeyVerifier) AfterPrepared(ctx context.Context) {
-	etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
-	Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPrepared), "rotation phase should be 'Prepared'")
-	Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime).NotTo(BeNil())
-	Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime.After(etcdEncryptionKeyRotation.LastInitiationTime.Time)).To(BeTrue())
+func (v *ETCDEncryptionKeyVerifier) AfterPrepared() {
+	It("rotation phase should be 'Prepared'", func() {
+		etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
+		Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPrepared))
+		Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime).NotTo(BeNil())
+		Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime.After(etcdEncryptionKeyRotation.LastInitiationTime.Time)).To(BeTrue())
+	})
 
-	By("Verify etcd encryption key secrets")
-	Eventually(func(g Gomega) {
-		secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), v.SecretsManagerLabelSelector)
-		g.Expect(err).NotTo(HaveOccurred())
+	It("Verify etcd encryption key secrets", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), v.SecretsManagerLabelSelector)
+			g.Expect(err).NotTo(HaveOccurred())
 
-		grouped := GroupByName(secretList.Items)
-		g.Expect(grouped[v.EncryptionKey]).To(HaveLen(2), "etcd encryption key should get rotated")
-		g.Expect(grouped[v.EncryptionKey]).To(ContainElement(v.secretsBefore[v.EncryptionKey][0]), "old etcd encryption key secret should be kept")
-		v.secretsPrepared = grouped
-	}).Should(Succeed())
+			grouped := GroupByName(secretList.Items)
+			g.Expect(grouped[v.EncryptionKey]).To(HaveLen(2), "etcd encryption key should get rotated")
+			g.Expect(grouped[v.EncryptionKey]).To(ContainElement(v.secretsBefore[v.EncryptionKey][0]), "old etcd encryption key secret should be kept")
+			v.secretsPrepared = grouped
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 
-	By("Verify combined etcd encryption config secret")
-	Eventually(func(g Gomega) {
-		secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), client.MatchingLabels{v1beta1constants.LabelRole: v.RoleLabelValue})
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(secretList.Items).NotTo(BeEmpty())
-		sort.Sort(sort.Reverse(AgeSorter(secretList.Items)))
+	It("Verify combined etcd encryption config secret", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), client.MatchingLabels{v1beta1constants.LabelRole: v.RoleLabelValue})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(secretList.Items).NotTo(BeEmpty())
+			sort.Sort(sort.Reverse(AgeSorter(secretList.Items)))
 
-		encryptionConfiguration := &apiserverconfigv1.EncryptionConfiguration{}
-		err = runtime.DecodeInto(decoder, secretList.Items[0].Data["encryption-configuration.yaml"], encryptionConfiguration)
-		g.Expect(err).NotTo(HaveOccurred())
+			encryptionConfiguration := &apiserverconfigv1.EncryptionConfiguration{}
+			err = runtime.DecodeInto(decoder, secretList.Items[0].Data["encryption-configuration.yaml"], encryptionConfiguration)
+			g.Expect(err).NotTo(HaveOccurred())
 
-		g.Expect(encryptionConfiguration.Resources).To(HaveLen(1))
-		g.Expect(encryptionConfiguration.Resources[0].Providers).To(DeepEqual([]apiserverconfigv1.ProviderConfiguration{
-			{
-				AESCBC: &apiserverconfigv1.AESConfiguration{
-					Keys: []apiserverconfigv1.Key{{
-						// new key
-						Name:   string(v.secretsPrepared[v.EncryptionKey][1].Data["key"]),
-						Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsPrepared[v.EncryptionKey][1]),
-					}, {
-						// old key
-						Name:   string(v.secretsPrepared[v.EncryptionKey][0].Data["key"]),
-						Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsPrepared[v.EncryptionKey][0]),
-					}},
+			g.Expect(encryptionConfiguration.Resources).To(HaveLen(1))
+			g.Expect(encryptionConfiguration.Resources[0].Providers).To(DeepEqual([]apiserverconfigv1.ProviderConfiguration{
+				{
+					AESCBC: &apiserverconfigv1.AESConfiguration{
+						Keys: []apiserverconfigv1.Key{{
+							// new key
+							Name:   string(v.secretsPrepared[v.EncryptionKey][1].Data["key"]),
+							Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsPrepared[v.EncryptionKey][1]),
+						}, {
+							// old key
+							Name:   string(v.secretsPrepared[v.EncryptionKey][0].Data["key"]),
+							Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsPrepared[v.EncryptionKey][0]),
+						}},
+					},
 				},
-			},
-			{
-				Identity: &apiserverconfigv1.IdentityConfiguration{},
-			},
-		}))
-	}).Should(Succeed(), "etcd encryption config should have both old and new key, with new key as the first one")
+				{
+					Identity: &apiserverconfigv1.IdentityConfiguration{},
+				},
+			}))
+		}).Should(Succeed(), "etcd encryption config should have both old and new key, with new key as the first one")
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
 func (v *ETCDEncryptionKeyVerifier) ExpectCompletingStatus(g Gomega) {
 	etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
 	g.Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationCompleting))
-	Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).NotTo(BeNil())
-	Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime.Time.Equal(etcdEncryptionKeyRotation.LastInitiationFinishedTime.Time) ||
+	g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).NotTo(BeNil())
+	g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime.Time.Equal(etcdEncryptionKeyRotation.LastInitiationFinishedTime.Time) ||
 		etcdEncryptionKeyRotation.LastCompletionTriggeredTime.After(etcdEncryptionKeyRotation.LastInitiationFinishedTime.Time)).To(BeTrue())
 }
 
 // AfterCompleted is called when the Shoot is in Completed status.
-func (v *ETCDEncryptionKeyVerifier) AfterCompleted(ctx context.Context) {
-	etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
-	Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationCompleted))
-	Expect(etcdEncryptionKeyRotation.LastCompletionTime.Time.UTC().After(etcdEncryptionKeyRotation.LastInitiationTime.Time.UTC())).To(BeTrue())
-	Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime).To(BeNil())
-	Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+func (v *ETCDEncryptionKeyVerifier) AfterCompleted() {
+	It("rotation phase should be 'Completed'", func() {
+		etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
+		Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationCompleted))
+		Expect(etcdEncryptionKeyRotation.LastCompletionTime.Time.UTC().After(etcdEncryptionKeyRotation.LastInitiationTime.Time.UTC())).To(BeTrue())
+		Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime).To(BeNil())
+		Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+	})
 
-	By("Verify new etcd encryption key secret")
-	Eventually(func(g Gomega) {
-		secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), v.SecretsManagerLabelSelector)
-		g.Expect(err).NotTo(HaveOccurred())
+	It("Verify new etcd encryption key secret", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), v.SecretsManagerLabelSelector)
+			g.Expect(err).NotTo(HaveOccurred())
 
-		grouped := GroupByName(secretList.Items)
-		g.Expect(grouped[v.EncryptionKey]).To(HaveLen(1), "old etcd encryption key should get cleaned up")
-		g.Expect(grouped[v.EncryptionKey]).To(ContainElement(v.secretsPrepared[v.EncryptionKey][1]), "new etcd encryption key secret should be kept")
-	}).Should(Succeed())
+			grouped := GroupByName(secretList.Items)
+			g.Expect(grouped[v.EncryptionKey]).To(HaveLen(1), "old etcd encryption key should get cleaned up")
+			g.Expect(grouped[v.EncryptionKey]).To(ContainElement(v.secretsPrepared[v.EncryptionKey][1]), "new etcd encryption key secret should be kept")
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 
-	By("Verify new etcd encryption config secret")
-	Eventually(func(g Gomega) {
-		secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), client.MatchingLabels{v1beta1constants.LabelRole: v.RoleLabelValue})
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(secretList.Items).NotTo(BeEmpty())
-		sort.Sort(sort.Reverse(AgeSorter(secretList.Items)))
+	It("Verify new etcd encryption config secret", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secretList, err := v.ListETCDEncryptionSecretsFunc(ctx, client.InNamespace(v.GetETCDSecretNamespace()), client.MatchingLabels{v1beta1constants.LabelRole: v.RoleLabelValue})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(secretList.Items).NotTo(BeEmpty())
+			sort.Sort(sort.Reverse(AgeSorter(secretList.Items)))
 
-		encryptionConfiguration := &apiserverconfigv1.EncryptionConfiguration{}
-		err = runtime.DecodeInto(decoder, secretList.Items[0].Data["encryption-configuration.yaml"], encryptionConfiguration)
-		g.Expect(err).NotTo(HaveOccurred())
+			encryptionConfiguration := &apiserverconfigv1.EncryptionConfiguration{}
+			err = runtime.DecodeInto(decoder, secretList.Items[0].Data["encryption-configuration.yaml"], encryptionConfiguration)
+			g.Expect(err).NotTo(HaveOccurred())
 
-		g.Expect(encryptionConfiguration.Resources).To(HaveLen(1))
-		g.Expect(encryptionConfiguration.Resources[0].Providers).To(DeepEqual([]apiserverconfigv1.ProviderConfiguration{
-			{
-				AESCBC: &apiserverconfigv1.AESConfiguration{
-					Keys: []apiserverconfigv1.Key{{
-						// new key
-						Name:   string(v.secretsPrepared[v.EncryptionKey][1].Data["key"]),
-						Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsPrepared[v.EncryptionKey][1]),
-					}},
+			g.Expect(encryptionConfiguration.Resources).To(HaveLen(1))
+			g.Expect(encryptionConfiguration.Resources[0].Providers).To(DeepEqual([]apiserverconfigv1.ProviderConfiguration{
+				{
+					AESCBC: &apiserverconfigv1.AESConfiguration{
+						Keys: []apiserverconfigv1.Key{{
+							// new key
+							Name:   string(v.secretsPrepared[v.EncryptionKey][1].Data["key"]),
+							Secret: getBase64EncodedETCDEncryptionKeyFromSecret(v.secretsPrepared[v.EncryptionKey][1]),
+						}},
+					},
 				},
-			},
-			{
-				Identity: &apiserverconfigv1.IdentityConfiguration{},
-			},
-		}))
-	}).Should(Succeed(), "etcd encryption config should only have new key")
+				{
+					Identity: &apiserverconfigv1.IdentityConfiguration{},
+				},
+			}))
+		}).Should(Succeed(), "etcd encryption config should only have new key")
+	}, SpecTimeout(time.Minute))
 }
 
 func getBase64EncodedETCDEncryptionKeyFromSecret(secret corev1.Secret) string {

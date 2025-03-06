@@ -29,7 +29,7 @@ type SSHKeypairVerifier struct {
 }
 
 // Before is called before the rotation is started.
-func (v *SSHKeypairVerifier) Before(_ context.Context) {
+func (v *SSHKeypairVerifier) Before() {
 	It("Verify current ssh-keypair secret is present", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
 			secret := &corev1.Secret{}
@@ -83,7 +83,7 @@ func (v *SSHKeypairVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gomega
 func (v *SSHKeypairVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
-func (v *SSHKeypairVerifier) AfterPrepared(_ context.Context) {
+func (v *SSHKeypairVerifier) AfterPrepared() {
 	It("rotation should be prepared", func() {
 		sshKeypairRotation := v.Shoot.Status.Credentials.Rotation.SSHKeypair
 		Expect(sshKeypairRotation.LastCompletionTime.Time.UTC().After(sshKeypairRotation.LastInitiationTime.Time.UTC())).To(BeTrue())
@@ -124,7 +124,7 @@ func (v *SSHKeypairVerifier) AfterPrepared(_ context.Context) {
 func (v *SSHKeypairVerifier) ExpectCompletingStatus(_ Gomega) {}
 
 // AfterCompleted is called when the Shoot is in Completed status.
-func (v *SSHKeypairVerifier) AfterCompleted(_ context.Context) {}
+func (v *SSHKeypairVerifier) AfterCompleted() {}
 
 // Since we can't (and do not want ;-)) trying to really SSH into the machine pods from our test environment, we can
 // only check whether the `.ssh/authorized_keys` file on the worker nodes has the expected content.

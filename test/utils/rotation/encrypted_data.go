@@ -6,6 +6,7 @@ package rotation
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,9 +28,10 @@ type EncryptedDataVerifier struct {
 }
 
 // Before is called before the rotation is started.
-func (v *EncryptedDataVerifier) Before(ctx context.Context) {
-	By("Verify encrypted data before credentials rotation")
-	v.verifyEncryptedData(ctx)
+func (v *EncryptedDataVerifier) Before() {
+	It("Verify encrypted data before credentials rotation", func(ctx SpecContext) {
+		v.verifyEncryptedData(ctx)
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
@@ -42,18 +44,20 @@ func (v *EncryptedDataVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gom
 func (v *EncryptedDataVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
-func (v *EncryptedDataVerifier) AfterPrepared(ctx context.Context) {
-	By("Verify encrypted data after preparing credentials rotation")
-	v.verifyEncryptedData(ctx)
+func (v *EncryptedDataVerifier) AfterPrepared() {
+	It("Verify encrypted data after preparing credentials rotation", func(ctx SpecContext) {
+		v.verifyEncryptedData(ctx)
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
 func (v *EncryptedDataVerifier) ExpectCompletingStatus(_ Gomega) {}
 
 // AfterCompleted is called when the Shoot is in Completed status.
-func (v *EncryptedDataVerifier) AfterCompleted(ctx context.Context) {
-	By("Verify encrypted data after credentials rotation")
-	v.verifyEncryptedData(ctx)
+func (v *EncryptedDataVerifier) AfterCompleted() {
+	It("Verify encrypted data after credentials rotation", func(ctx SpecContext) {
+		v.verifyEncryptedData(ctx)
+	}, SpecTimeout(time.Minute))
 }
 
 func (v *EncryptedDataVerifier) verifyEncryptedData(ctx context.Context) {
@@ -62,18 +66,18 @@ func (v *EncryptedDataVerifier) verifyEncryptedData(ctx context.Context) {
 		err          error
 	)
 
-	Eventually(func(g Gomega) {
+	Eventually(ctx, func(g Gomega) {
 		targetClient, err = v.NewTargetClientFunc(ctx)
 		g.Expect(err).NotTo(HaveOccurred())
 	}).Should(Succeed())
 
 	for _, resource := range v.Resources {
 		obj := resource.NewObject()
-		Eventually(func(g Gomega) {
+		Eventually(ctx, func(g Gomega) {
 			g.Expect(targetClient.Client().Create(ctx, obj)).To(Succeed())
 		}).Should(Succeed(), "creating resource should succeed for "+client.ObjectKeyFromObject(obj).String())
 
-		Eventually(func(g Gomega) {
+		Eventually(ctx, func(g Gomega) {
 			g.Expect(targetClient.Client().List(ctx, resource.NewEmptyList())).To(Succeed())
 		}).Should(Succeed(), "reading all encrypted resources should succeed")
 	}

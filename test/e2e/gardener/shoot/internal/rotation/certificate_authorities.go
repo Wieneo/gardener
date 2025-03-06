@@ -5,7 +5,6 @@
 package rotation
 
 import (
-	"context"
 	"strings"
 	"time"
 
@@ -59,7 +58,7 @@ const (
 )
 
 // Before is called before the rotation is started.
-func (v *CAVerifier) Before(_ context.Context) {
+func (v *CAVerifier) Before() {
 	It("Verify CA secrets of gardenlet before rotation", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
 			secretList := &corev1.SecretList{}
@@ -144,7 +143,7 @@ func (v *CAVerifier) ExpectWaitingForWorkersRolloutStatus(g Gomega) {
 }
 
 // AfterPrepared is called when the Shoot is in Prepared status.
-func (v *CAVerifier) AfterPrepared(_ context.Context) {
+func (v *CAVerifier) AfterPrepared() {
 	It("ca rotation phase should be 'Prepared'", func() {
 		Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.Phase).To(Equal(gardencorev1beta1.RotationPrepared))
 		Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).NotTo(BeNil())
@@ -234,7 +233,7 @@ func (v *CAVerifier) ExpectCompletingStatus(g Gomega) {
 }
 
 // AfterCompleted is called when the Shoot is in Completed status.
-func (v *CAVerifier) AfterCompleted(_ context.Context) {
+func (v *CAVerifier) AfterCompleted() {
 	It("ca rotation phase should be 'Completed'", func() {
 		caRotation := v.Shoot.Status.Credentials.Rotation.CertificateAuthorities
 		Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationCompleted))

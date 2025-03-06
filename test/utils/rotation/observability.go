@@ -30,26 +30,28 @@ type ObservabilityVerifier struct {
 }
 
 // Before is called before the rotation is started.
-func (v *ObservabilityVerifier) Before(ctx context.Context) {
-	By("Verify old observability secret")
-	Eventually(func(g Gomega) {
-		secret, err := v.GetObservabilitySecretFunc(ctx)
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(secret.Data).To(And(
-			HaveKeyWithValue("username", Not(BeEmpty())),
-			HaveKeyWithValue("password", Not(BeEmpty())),
-		))
+func (v *ObservabilityVerifier) Before() {
+	It("Verify old observability secret", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secret, err := v.GetObservabilitySecretFunc(ctx)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(secret.Data).To(And(
+				HaveKeyWithValue("username", Not(BeEmpty())),
+				HaveKeyWithValue("password", Not(BeEmpty())),
+			))
 
-		v.observabilityEndpoint = v.GetObservabilityEndpoint(secret)
-		v.oldKeypairData = secret.Data
-	}).Should(Succeed(), "old observability secret should be present")
+			v.observabilityEndpoint = v.GetObservabilityEndpoint(secret)
+			v.oldKeypairData = secret.Data
+		}).Should(Succeed(), "old observability secret should be present")
+	}, SpecTimeout(time.Minute))
 
-	By("Use old credentials to access observability endpoint")
-	Eventually(func(g Gomega) {
-		response, err := accessEndpoint(ctx, v.observabilityEndpoint, v.oldKeypairData["username"], v.oldKeypairData["password"])
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(response.StatusCode).To(Equal(http.StatusOK))
-	}).Should(Succeed())
+	It("Use old credentials to access observability endpoint", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			response, err := accessEndpoint(ctx, v.observabilityEndpoint, v.oldKeypairData["username"], v.oldKeypairData["password"])
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(response.StatusCode).To(Equal(http.StatusOK))
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
@@ -64,38 +66,43 @@ func (v *ObservabilityVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gom
 func (v *ObservabilityVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
-func (v *ObservabilityVerifier) AfterPrepared(ctx context.Context) {
-	observabilityRotation := v.GetObservabilityRotation()
-	Expect(observabilityRotation.LastCompletionTime.Time.UTC().After(observabilityRotation.LastInitiationTime.Time.UTC())).To(BeTrue())
+func (v *ObservabilityVerifier) AfterPrepared() {
+	It("Verify last completion time for observability rotation", func() {
+		observabilityRotation := v.GetObservabilityRotation()
+		Expect(observabilityRotation.LastCompletionTime.Time.UTC().After(observabilityRotation.LastInitiationTime.Time.UTC())).To(BeTrue())
+	})
 
-	By("Use old credentials to access observability endpoint")
-	Consistently(func(g Gomega) {
-		response, err := accessEndpoint(ctx, v.observabilityEndpoint, v.oldKeypairData["username"], v.oldKeypairData["password"])
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(response.StatusCode).To(Equal(http.StatusUnauthorized))
-	}).Should(Succeed())
+	It("Use old credentials to access observability endpoint", func(ctx SpecContext) {
+		Consistently(ctx, func(g Gomega) {
+			response, err := accessEndpoint(ctx, v.observabilityEndpoint, v.oldKeypairData["username"], v.oldKeypairData["password"])
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(response.StatusCode).To(Equal(http.StatusUnauthorized))
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 
-	By("Verify new observability secret")
 	var (
 		secret *corev1.Secret
 		err    error
 	)
 
-	Eventually(func(g Gomega) {
-		secret, err = v.GetObservabilitySecretFunc(ctx)
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(secret.Data).To(And(
-			HaveKeyWithValue("username", Equal(v.oldKeypairData["username"])),
-			HaveKeyWithValue("password", Not(Equal(v.oldKeypairData["password"]))),
-		))
-	}).Should(Succeed(), "observability secret should have been rotated")
+	It("Verify new observability secret", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			secret, err = v.GetObservabilitySecretFunc(ctx)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(secret.Data).To(And(
+				HaveKeyWithValue("username", Equal(v.oldKeypairData["username"])),
+				HaveKeyWithValue("password", Not(Equal(v.oldKeypairData["password"]))),
+			))
+		}).Should(Succeed(), "observability secret should have been rotated")
+	}, SpecTimeout(time.Minute))
 
-	By("Use new credentials to access observability endpoint")
-	Eventually(func(g Gomega) {
-		response, err := accessEndpoint(ctx, v.observabilityEndpoint, secret.Data["username"], secret.Data["password"])
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(response.StatusCode).To(Equal(http.StatusOK))
-	}).Should(Succeed())
+	It("Use new credentials to access observability endpoint", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			response, err := accessEndpoint(ctx, v.observabilityEndpoint, secret.Data["username"], secret.Data["password"])
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(response.StatusCode).To(Equal(http.StatusOK))
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // observability credentials rotation is completed after one reconciliation (there is no second phase)
@@ -105,7 +112,7 @@ func (v *ObservabilityVerifier) AfterPrepared(ctx context.Context) {
 func (v *ObservabilityVerifier) ExpectCompletingStatus(_ Gomega) {}
 
 // AfterCompleted is called when the Shoot is in Completed status.
-func (v *ObservabilityVerifier) AfterCompleted(_ context.Context) {}
+func (v *ObservabilityVerifier) AfterCompleted() {}
 
 func accessEndpoint(ctx context.Context, url string, username, password []byte) (*http.Response, error) {
 	httpClient := &http.Client{
