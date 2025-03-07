@@ -58,13 +58,13 @@ func (v *VirtualGardenAccessVerifier) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v *VirtualGardenAccessVerifier) ExpectPreparingStatus(_ Gomega) {}
+func (v *VirtualGardenAccessVerifier) ExpectPreparingStatus() {}
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v *VirtualGardenAccessVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gomega) {}
+func (v *VirtualGardenAccessVerifier) ExpectPreparingWithoutWorkersRolloutStatus() {}
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v *VirtualGardenAccessVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
+func (v *VirtualGardenAccessVerifier) ExpectWaitingForWorkersRolloutStatus() {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
 func (v *VirtualGardenAccessVerifier) AfterPrepared() {
@@ -108,7 +108,7 @@ func (v *VirtualGardenAccessVerifier) AfterPrepared() {
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v *VirtualGardenAccessVerifier) ExpectCompletingStatus(_ Gomega) {}
+func (v *VirtualGardenAccessVerifier) ExpectCompletingStatus() {}
 
 // AfterCompleted is called when the Shoot is in Completed status.
 func (v *VirtualGardenAccessVerifier) AfterCompleted() {
@@ -165,20 +165,15 @@ func (v *VirtualGardenAccessVerifier) AfterCompleted() {
 
 // Cleanup is passed to ginkgo.DeferCleanup.
 func (v *VirtualGardenAccessVerifier) Cleanup() {
-	var virtualGardenClient kubernetes.Interface
-
 	It("Clean up objects in virtual garden from client certificate access", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
-			var err error
-			virtualGardenClient, err = kubernetes.NewClientFromSecret(ctx, v.GardenClient, v.Namespace, "gardener", kubernetes.WithDisabledCachedClient())
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(access.CleanupObjectsFromCSRAccess(ctx, virtualGardenClient)).To(Succeed())
+			g.Expect(access.CleanupObjectsFromCSRAccess(ctx, v.VirtualClusterClientSet)).To(Succeed())
 		}).Should(Succeed())
 	}, SpecTimeout(time.Minute))
 
 	It("Clean up objects in virtual garden from dynamic ServiceAccount token access", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
-			g.Expect(access.CleanupObjectsFromDynamicServiceAccountTokenAccess(ctx, virtualGardenClient)).To(Succeed())
+			g.Expect(access.CleanupObjectsFromDynamicServiceAccountTokenAccess(ctx, v.VirtualClusterClientSet)).To(Succeed())
 		}).Should(Succeed())
 	}, SpecTimeout(time.Minute))
 }

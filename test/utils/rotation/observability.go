@@ -55,15 +55,19 @@ func (v *ObservabilityVerifier) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v *ObservabilityVerifier) ExpectPreparingStatus(g Gomega) {
-	g.Expect(time.Now().UTC().Sub(v.GetObservabilityRotation().LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+func (v *ObservabilityVerifier) ExpectPreparingStatus() {
+	It("expect last initiation time to be set", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			g.Expect(time.Now().UTC().Sub(v.GetObservabilityRotation().LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v *ObservabilityVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gomega) {}
+func (v *ObservabilityVerifier) ExpectPreparingWithoutWorkersRolloutStatus() {}
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v *ObservabilityVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
+func (v *ObservabilityVerifier) ExpectWaitingForWorkersRolloutStatus() {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
 func (v *ObservabilityVerifier) AfterPrepared() {
@@ -109,7 +113,7 @@ func (v *ObservabilityVerifier) AfterPrepared() {
 // hence, there is nothing to check in the second part of the credentials rotation
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v *ObservabilityVerifier) ExpectCompletingStatus(_ Gomega) {}
+func (v *ObservabilityVerifier) ExpectCompletingStatus() {}
 
 // AfterCompleted is called when the Shoot is in Completed status.
 func (v *ObservabilityVerifier) AfterCompleted() {}

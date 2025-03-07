@@ -119,27 +119,39 @@ func (v *CAVerifier) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v *CAVerifier) ExpectPreparingStatus(g Gomega) {
-	g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationPreparing))
-	g.Expect(time.Now().UTC().Sub(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+func (v *CAVerifier) ExpectPreparingStatus() {
+	It("expect preparing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationPreparing))
+			g.Expect(time.Now().UTC().Sub(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v *CAVerifier) ExpectPreparingWithoutWorkersRolloutStatus(g Gomega) {
-	g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationPreparingWithoutWorkersRollout))
-	g.Expect(time.Now().UTC().Sub(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+func (v *CAVerifier) ExpectPreparingWithoutWorkersRolloutStatus() {
+	It("expect preparing without workers rollout status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationPreparingWithoutWorkersRollout))
+			g.Expect(time.Now().UTC().Sub(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v *CAVerifier) ExpectWaitingForWorkersRolloutStatus(g Gomega) {
-	g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationWaitingForWorkersRollout))
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime).NotTo(BeNil())
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+func (v *CAVerifier) ExpectWaitingForWorkersRolloutStatus() {
+	It("expect waiting for workers rollout status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationWaitingForWorkersRollout))
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime).NotTo(BeNil())
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // AfterPrepared is called when the Shoot is in Prepared status.
@@ -225,11 +237,15 @@ func (v *CAVerifier) AfterPrepared() {
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v *CAVerifier) ExpectCompletingStatus(g Gomega) {
-	g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationCompleting))
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).NotTo(BeNil())
-	g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.Time.Equal(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time) ||
-		v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.After(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time)).To(BeTrue())
+func (v *CAVerifier) ExpectCompletingStatus() {
+	It("expect completing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			g.Expect(v1beta1helper.GetShootCARotationPhase(v.Shoot.Status.Credentials)).To(Equal(gardencorev1beta1.RotationCompleting))
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).NotTo(BeNil())
+			g.Expect(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.Time.Equal(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time) ||
+				v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.After(v.Shoot.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time)).To(BeTrue())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // AfterCompleted is called when the Shoot is in Completed status.

@@ -20,14 +20,12 @@ import (
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	v1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
-	"github.com/gardener/gardener/pkg/client/kubernetes"
 	gardenerutils "github.com/gardener/gardener/pkg/utils/gardener"
 	. "github.com/gardener/gardener/test/e2e"
 	. "github.com/gardener/gardener/test/e2e/gardener"
 	. "github.com/gardener/gardener/test/e2e/gardener/shoot/internal"
 	"github.com/gardener/gardener/test/e2e/gardener/shoot/internal/inclusterclient"
 	"github.com/gardener/gardener/test/e2e/gardener/shoot/internal/rotation"
-	"github.com/gardener/gardener/test/utils/access"
 	rotationutils "github.com/gardener/gardener/test/utils/rotation"
 )
 
@@ -40,14 +38,7 @@ func testCredentialRotation(s *ShootContext, v rotationutils.Verifiers, startRot
 		})
 
 		itShouldEventuallyNotHaveOperationAnnotation(s)
-
-		It("Rotation in preparing status", func(ctx SpecContext) {
-			Eventually(ctx, func(g Gomega) {
-				g.Expect(s.GardenClient.Get(ctx, client.ObjectKeyFromObject(s.Shoot), s.Shoot)).To(Succeed())
-				v.ExpectPreparingStatus(g)
-			}).Should(Succeed())
-		}, SpecTimeout(time.Minute))
-
+		v.ExpectPreparingStatus()
 		ItShouldWaitForShootToBeReconciledAndHealthy(s)
 		v.AfterPrepared()
 	}
@@ -62,16 +53,10 @@ func testCredentialRotationComplete(s *ShootContext, v rotationutils.Verifiers, 
 		})
 
 		itShouldEventuallyNotHaveOperationAnnotation(s)
-
-		It("Rotation in completing status", func(ctx SpecContext) {
-			Eventually(ctx, func(g Gomega) {
-				g.Expect(s.GardenClient.Get(ctx, client.ObjectKeyFromObject(s.Shoot), s.Shoot)).To(Succeed())
-				v.ExpectCompletingStatus(g)
-			}).Should(Succeed())
-		}, SpecTimeout(time.Minute))
-
+		v.ExpectCompletingStatus()
 		ItShouldWaitForShootToBeReconciledAndHealthy(s)
-
+		// renew shoot clients after rotation
+		ItShouldInitializeShootClient(s)
 		v.AfterCompleted()
 	}
 
@@ -100,20 +85,9 @@ func testCredentialRotationWithoutWorkersRollout(s *ShootContext, v rotationutil
 	})
 
 	itShouldEventuallyNotHaveOperationAnnotation(s)
-
-	It("Rotation in preparing without workers rollout status", func(ctx SpecContext) {
-		Eventually(ctx, func(g Gomega) {
-			v.ExpectPreparingWithoutWorkersRolloutStatus(g)
-		}).Should(Succeed())
-	}, SpecTimeout(time.Minute))
-
+	v.ExpectPreparingWithoutWorkersRolloutStatus()
 	ItShouldWaitForShootToBeReconciledAndHealthy(s)
-
-	It("Ensure workers were not rolled out", func(ctx SpecContext) {
-		Eventually(ctx, func(g Gomega) {
-			v.ExpectWaitingForWorkersRolloutStatus(g)
-		}).Should(Succeed())
-	}, SpecTimeout(time.Minute))
+	v.ExpectWaitingForWorkersRolloutStatus()
 
 	It("Compare machine pod names", func(ctx SpecContext) {
 		afterStartMachinePodList := &corev1.PodList{}
@@ -259,8 +233,8 @@ var _ = Describe("Shoot Tests", Label("Shoot", "default"), func() {
 				},
 				// advanced verifiers testing things from the user's perspective
 				&rotationutils.EncryptedDataVerifier{
-					NewTargetClientFunc: func(ctx context.Context) (kubernetes.Interface, error) {
-						return access.CreateShootClientFromAdminKubeconfig(ctx, s.GardenClientSet, s.Shoot)
+					TargetClientFunc: func() client.Client {
+						return s.ShootClient
 					},
 					Resources: []rotationutils.EncryptedResource{
 						{
@@ -288,8 +262,6 @@ var _ = Describe("Shoot Tests", Label("Shoot", "default"), func() {
 			}
 
 			if !v1beta1helper.IsWorkerless(s.Shoot) {
-				// renew shoot clients after rotation
-				ItShouldInitializeShootClient(s)
 				inclusterclient.VerifyInClusterAccessToAPIServer(s)
 			}
 

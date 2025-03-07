@@ -18,8 +18,6 @@ import (
 	gardencorev1 "github.com/gardener/gardener/pkg/apis/core/v1"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
-	"github.com/gardener/gardener/pkg/client/kubernetes"
-	operatorclient "github.com/gardener/gardener/pkg/operator/client"
 	"github.com/gardener/gardener/pkg/utils"
 	. "github.com/gardener/gardener/test/e2e"
 	. "github.com/gardener/gardener/test/e2e/gardener"
@@ -33,10 +31,11 @@ var _ = Describe("Garden Tests", Label("Garden", "default"), func() {
 		test := func(s *GardenContext) {
 			ItShouldCreateGarden(s)
 			ItShouldWaitForGardenToBeReconciledAndHealthy(s)
+			ItShouldInitializeVirtualClusterClient(s)
 
 			v := rotationutils.Verifiers{
 				// basic verifiers checking secrets
-				&rotation.CAVerifier{RuntimeClient: s.GardenClient, Garden: s.Garden},
+				&rotation.CAVerifier{GardenContext: s},
 				&rotationutils.ObservabilityVerifier{
 					GetObservabilitySecretFunc: func(ctx context.Context) (*corev1.Secret, error) {
 						secretList := &corev1.SecretList{}
@@ -111,11 +110,8 @@ var _ = Describe("Garden Tests", Label("Garden", "default"), func() {
 
 				// advanced verifiers testing things from the user's perspective
 				&rotationutils.EncryptedDataVerifier{
-					NewTargetClientFunc: func(ctx context.Context) (kubernetes.Interface, error) {
-						return kubernetes.NewClientFromSecret(ctx, s.GardenClient, v1beta1constants.GardenNamespace, "gardener",
-							kubernetes.WithDisabledCachedClient(),
-							kubernetes.WithClientOptions(client.Options{Scheme: operatorclient.VirtualScheme}),
-						)
+					TargetClientFunc: func() client.Client {
+						return s.VirtualClusterClient
 					},
 					Resources: []rotationutils.EncryptedResource{
 						{
@@ -179,16 +175,8 @@ var _ = Describe("Garden Tests", Label("Garden", "default"), func() {
 			})
 
 			itShouldEventuallyNotHaveOperationAnnotation(s)
-
-			It("Rotation in preparing status", func(ctx SpecContext) {
-				Eventually(ctx, func(g Gomega) {
-					g.Expect(s.GardenKomega.Get(s.Garden)()).To(Succeed())
-					v.ExpectPreparingStatus(g)
-				}).Should(Succeed())
-			}, SpecTimeout(time.Minute))
-
+			v.ExpectPreparingStatus()
 			ItShouldWaitForGardenToBeReconciledAndHealthy(s)
-
 			v.AfterPrepared()
 
 			ItShouldAnnotateGarden(s, map[string]string{
@@ -196,19 +184,13 @@ var _ = Describe("Garden Tests", Label("Garden", "default"), func() {
 			})
 
 			itShouldEventuallyNotHaveOperationAnnotation(s)
-
-			It("Rotation in completing status", func(ctx SpecContext) {
-				Eventually(ctx, func(g Gomega) {
-					g.Expect(s.GardenKomega.Get(s.Garden)()).To(Succeed())
-					v.ExpectCompletingStatus(g)
-				}).Should(Succeed())
-			}, SpecTimeout(time.Minute))
-
+			v.ExpectCompletingStatus()
 			ItShouldWaitForGardenToBeReconciledAndHealthy(s)
 
+			// renew virtual garden client after rotation
+			ItShouldInitializeVirtualClusterClient(s)
 			v.AfterCompleted()
 			v.Cleanup()
-
 			ItShouldDeleteGarden(s)
 			ItShouldWaitForGardenToBeDeleted(s)
 			ItShouldCleanUp(s)

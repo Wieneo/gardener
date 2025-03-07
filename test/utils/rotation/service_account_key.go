@@ -48,30 +48,42 @@ func (v *ServiceAccountKeyVerifier) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v *ServiceAccountKeyVerifier) ExpectPreparingStatus(g Gomega) {
-	serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
-	g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPreparing))
-	g.Expect(time.Now().UTC().Sub(serviceAccountKeyRotation.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
-	g.Expect(serviceAccountKeyRotation.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+func (v *ServiceAccountKeyVerifier) ExpectPreparingStatus() {
+	It("expect preparing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
+			g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPreparing))
+			g.Expect(time.Now().UTC().Sub(serviceAccountKeyRotation.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+			g.Expect(serviceAccountKeyRotation.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v *ServiceAccountKeyVerifier) ExpectPreparingWithoutWorkersRolloutStatus(g Gomega) {
-	serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
-	g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPreparingWithoutWorkersRollout))
-	g.Expect(time.Now().UTC().Sub(serviceAccountKeyRotation.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
-	g.Expect(serviceAccountKeyRotation.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+func (v *ServiceAccountKeyVerifier) ExpectPreparingWithoutWorkersRolloutStatus() {
+	It("expect preparing without workers rollout", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
+			g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPreparingWithoutWorkersRollout))
+			g.Expect(time.Now().UTC().Sub(serviceAccountKeyRotation.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+			g.Expect(serviceAccountKeyRotation.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v *ServiceAccountKeyVerifier) ExpectWaitingForWorkersRolloutStatus(g Gomega) {
-	serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
-	g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationWaitingForWorkersRollout))
-	g.Expect(serviceAccountKeyRotation.LastInitiationTime).NotTo(BeNil())
-	g.Expect(serviceAccountKeyRotation.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+func (v *ServiceAccountKeyVerifier) ExpectWaitingForWorkersRolloutStatus() {
+	It("expect waiting for workers rollout", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
+			g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationWaitingForWorkersRollout))
+			g.Expect(serviceAccountKeyRotation.LastInitiationTime).NotTo(BeNil())
+			g.Expect(serviceAccountKeyRotation.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // AfterPrepared is called when the Shoot is in Prepared status.
@@ -100,12 +112,16 @@ func (v *ServiceAccountKeyVerifier) AfterPrepared() {
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v *ServiceAccountKeyVerifier) ExpectCompletingStatus(g Gomega) {
-	serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
-	g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationCompleting))
-	g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).NotTo(BeNil())
-	g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime.Time.Equal(serviceAccountKeyRotation.LastInitiationFinishedTime.Time) ||
-		serviceAccountKeyRotation.LastCompletionTriggeredTime.After(serviceAccountKeyRotation.LastInitiationFinishedTime.Time)).To(BeTrue())
+func (v *ServiceAccountKeyVerifier) ExpectCompletingStatus() {
+	It("expect completing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			serviceAccountKeyRotation := v.GetServiceAccountKeyRotation()
+			g.Expect(serviceAccountKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationCompleting))
+			g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime).NotTo(BeNil())
+			g.Expect(serviceAccountKeyRotation.LastCompletionTriggeredTime.Time.Equal(serviceAccountKeyRotation.LastInitiationFinishedTime.Time) ||
+				serviceAccountKeyRotation.LastCompletionTriggeredTime.After(serviceAccountKeyRotation.LastInitiationFinishedTime.Time)).To(BeTrue())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // AfterCompleted is called when the Shoot is in Completed status.

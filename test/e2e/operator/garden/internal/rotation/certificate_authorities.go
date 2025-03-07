@@ -14,15 +14,14 @@ import (
 
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
-	operatorv1alpha1 "github.com/gardener/gardener/pkg/apis/operator/v1alpha1"
 	"github.com/gardener/gardener/pkg/apis/operator/v1alpha1/helper"
+	. "github.com/gardener/gardener/test/e2e/gardener"
 	"github.com/gardener/gardener/test/utils/rotation"
 )
 
 // CAVerifier verifies the certificate authorities rotation.
 type CAVerifier struct {
-	RuntimeClient client.Client
-	Garden        *operatorv1alpha1.Garden
+	*GardenContext
 
 	secretsBefore    rotation.SecretConfigNamesToSecrets
 	secretsPrepared  rotation.SecretConfigNamesToSecrets
@@ -52,7 +51,7 @@ func (v *CAVerifier) Before() {
 	It("Verify CA secrets of gardener-operator before rotation", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
 			secretList := &corev1.SecretList{}
-			g.Expect(v.RuntimeClient.List(ctx, secretList, client.InNamespace(v1beta1constants.GardenNamespace), ManagedByGardenerOperatorSecretsManager)).To(Succeed())
+			g.Expect(v.GardenClient.List(ctx, secretList, client.InNamespace(v1beta1constants.GardenNamespace), ManagedByGardenerOperatorSecretsManager)).To(Succeed())
 
 			grouped := rotation.GroupByName(secretList.Items)
 			for _, ca := range allCAs {
@@ -66,18 +65,23 @@ func (v *CAVerifier) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v *CAVerifier) ExpectPreparingStatus(g Gomega) {
-	g.Expect(helper.GetCARotationPhase(v.Garden.Status.Credentials)).To(Equal(gardencorev1beta1.RotationPreparing))
-	g.Expect(time.Now().UTC().Sub(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
-	g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+func (v *CAVerifier) ExpectPreparingStatus() {
+	It("expect preparing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			g.Expect(v.GardenKomega.Get(v.Garden)()).To(Succeed())
+			g.Expect(helper.GetCARotationPhase(v.Garden.Status.Credentials)).To(Equal(gardencorev1beta1.RotationPreparing))
+			g.Expect(time.Now().UTC().Sub(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+			g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v *CAVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gomega) {}
+func (v *CAVerifier) ExpectPreparingWithoutWorkersRolloutStatus() {}
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v *CAVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
+func (v *CAVerifier) ExpectWaitingForWorkersRolloutStatus() {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
 func (v *CAVerifier) AfterPrepared() {
@@ -90,7 +94,7 @@ func (v *CAVerifier) AfterPrepared() {
 	It("Verify CA secrets of gardener-operator after preparation", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
 			secretList := &corev1.SecretList{}
-			g.Expect(v.RuntimeClient.List(ctx, secretList, client.InNamespace(v1beta1constants.GardenNamespace), ManagedByGardenerOperatorSecretsManager)).To(Succeed())
+			g.Expect(v.GardenClient.List(ctx, secretList, client.InNamespace(v1beta1constants.GardenNamespace), ManagedByGardenerOperatorSecretsManager)).To(Succeed())
 
 			grouped := rotation.GroupByName(secretList.Items)
 			for _, ca := range allCAs {
@@ -106,11 +110,16 @@ func (v *CAVerifier) AfterPrepared() {
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v *CAVerifier) ExpectCompletingStatus(g Gomega) {
-	g.Expect(helper.GetCARotationPhase(v.Garden.Status.Credentials)).To(Equal(gardencorev1beta1.RotationCompleting))
-	g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).NotTo(BeNil())
-	g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.Time.Equal(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time) ||
-		v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.After(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time)).To(BeTrue())
+func (v *CAVerifier) ExpectCompletingStatus() {
+	It("expect completing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			g.Expect(v.GardenKomega.Get(v.Garden)()).To(Succeed())
+			g.Expect(helper.GetCARotationPhase(v.Garden.Status.Credentials)).To(Equal(gardencorev1beta1.RotationCompleting))
+			g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime).NotTo(BeNil())
+			g.Expect(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.Time.Equal(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time) ||
+				v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastCompletionTriggeredTime.After(v.Garden.Status.Credentials.Rotation.CertificateAuthorities.LastInitiationFinishedTime.Time)).To(BeTrue())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // AfterCompleted is called when the Shoot is in Completed status.
@@ -126,7 +135,7 @@ func (v *CAVerifier) AfterCompleted() {
 	It("Verify CA secrets of gardener-operator after completion", func(ctx SpecContext) {
 		Eventually(ctx, func(g Gomega) {
 			secretList := &corev1.SecretList{}
-			g.Expect(v.RuntimeClient.List(ctx, secretList, client.InNamespace(v1beta1constants.GardenNamespace), ManagedByGardenerOperatorSecretsManager)).To(Succeed())
+			g.Expect(v.GardenClient.List(ctx, secretList, client.InNamespace(v1beta1constants.GardenNamespace), ManagedByGardenerOperatorSecretsManager)).To(Succeed())
 
 			grouped := rotation.GroupByName(secretList.Items)
 			for _, ca := range allCAs {

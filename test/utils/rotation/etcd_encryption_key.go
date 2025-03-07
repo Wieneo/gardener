@@ -91,19 +91,23 @@ func (v *ETCDEncryptionKeyVerifier) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v *ETCDEncryptionKeyVerifier) ExpectPreparingStatus(g Gomega) {
-	etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
-	g.Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPreparing))
-	g.Expect(time.Now().UTC().Sub(etcdEncryptionKeyRotation.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
-	g.Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime).To(BeNil())
-	g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+func (v *ETCDEncryptionKeyVerifier) ExpectPreparingStatus() {
+	It("expect preparing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
+			g.Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationPreparing))
+			g.Expect(time.Now().UTC().Sub(etcdEncryptionKeyRotation.LastInitiationTime.Time.UTC())).To(BeNumerically("<=", time.Minute))
+			g.Expect(etcdEncryptionKeyRotation.LastInitiationFinishedTime).To(BeNil())
+			g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).To(BeNil())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v *ETCDEncryptionKeyVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gomega) {}
+func (v *ETCDEncryptionKeyVerifier) ExpectPreparingWithoutWorkersRolloutStatus() {}
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v *ETCDEncryptionKeyVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
+func (v *ETCDEncryptionKeyVerifier) ExpectWaitingForWorkersRolloutStatus() {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
 func (v *ETCDEncryptionKeyVerifier) AfterPrepared() {
@@ -161,12 +165,16 @@ func (v *ETCDEncryptionKeyVerifier) AfterPrepared() {
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v *ETCDEncryptionKeyVerifier) ExpectCompletingStatus(g Gomega) {
-	etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
-	g.Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationCompleting))
-	g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).NotTo(BeNil())
-	g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime.Time.Equal(etcdEncryptionKeyRotation.LastInitiationFinishedTime.Time) ||
-		etcdEncryptionKeyRotation.LastCompletionTriggeredTime.After(etcdEncryptionKeyRotation.LastInitiationFinishedTime.Time)).To(BeTrue())
+func (v *ETCDEncryptionKeyVerifier) ExpectCompletingStatus() {
+	It("expect completing status", func(ctx SpecContext) {
+		Eventually(ctx, func(g Gomega) {
+			etcdEncryptionKeyRotation := v.GetETCDEncryptionKeyRotation()
+			g.Expect(etcdEncryptionKeyRotation.Phase).To(Equal(gardencorev1beta1.RotationCompleting))
+			g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime).NotTo(BeNil())
+			g.Expect(etcdEncryptionKeyRotation.LastCompletionTriggeredTime.Time.Equal(etcdEncryptionKeyRotation.LastInitiationFinishedTime.Time) ||
+				etcdEncryptionKeyRotation.LastCompletionTriggeredTime.After(etcdEncryptionKeyRotation.LastInitiationFinishedTime.Time)).To(BeTrue())
+		}).Should(Succeed())
+	}, SpecTimeout(time.Minute))
 }
 
 // AfterCompleted is called when the Shoot is in Completed status.

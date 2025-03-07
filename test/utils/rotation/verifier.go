@@ -4,24 +4,20 @@
 
 package rotation
 
-import (
-	. "github.com/onsi/gomega"
-)
-
 // Verifier does some assertions in different phases of the credentials rotation test.
 type Verifier interface {
 	// Before is called before the rotation is started.
 	Before()
 	// ExpectPreparingStatus is called while waiting for the Preparing status.
-	ExpectPreparingStatus(g Gomega)
+	ExpectPreparingStatus()
 	// ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-	ExpectPreparingWithoutWorkersRolloutStatus(g Gomega)
+	ExpectPreparingWithoutWorkersRolloutStatus()
 	// ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-	ExpectWaitingForWorkersRolloutStatus(g Gomega)
+	ExpectWaitingForWorkersRolloutStatus()
 	// AfterPrepared is called when the Shoot is in Prepared status.
 	AfterPrepared()
 	// ExpectCompletingStatus is called while waiting for the Completing status.
-	ExpectCompletingStatus(g Gomega)
+	ExpectCompletingStatus()
 	// AfterCompleted is called when the Shoot is in Completed status.
 	AfterCompleted()
 }
@@ -40,23 +36,23 @@ func (v Verifiers) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v Verifiers) ExpectPreparingStatus(g Gomega) {
+func (v Verifiers) ExpectPreparingStatus() {
 	for _, vv := range v {
-		vv.ExpectPreparingStatus(g)
+		vv.ExpectPreparingStatus()
 	}
 }
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v Verifiers) ExpectPreparingWithoutWorkersRolloutStatus(g Gomega) {
+func (v Verifiers) ExpectPreparingWithoutWorkersRolloutStatus() {
 	for _, vv := range v {
-		vv.ExpectPreparingWithoutWorkersRolloutStatus(g)
+		vv.ExpectPreparingWithoutWorkersRolloutStatus()
 	}
 }
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v Verifiers) ExpectWaitingForWorkersRolloutStatus(g Gomega) {
+func (v Verifiers) ExpectWaitingForWorkersRolloutStatus() {
 	for _, vv := range v {
-		vv.ExpectWaitingForWorkersRolloutStatus(g)
+		vv.ExpectWaitingForWorkersRolloutStatus()
 	}
 }
 
@@ -68,9 +64,9 @@ func (v Verifiers) AfterPrepared() {
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v Verifiers) ExpectCompletingStatus(g Gomega) {
+func (v Verifiers) ExpectCompletingStatus() {
 	for _, vv := range v {
-		vv.ExpectCompletingStatus(g)
+		vv.ExpectCompletingStatus()
 	}
 }
 

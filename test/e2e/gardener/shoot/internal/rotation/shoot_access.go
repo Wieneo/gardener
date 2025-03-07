@@ -76,13 +76,13 @@ func (v *ShootAccessVerifier) Before() {
 }
 
 // ExpectPreparingStatus is called while waiting for the Preparing status.
-func (v *ShootAccessVerifier) ExpectPreparingStatus(_ Gomega) {}
+func (v *ShootAccessVerifier) ExpectPreparingStatus() {}
 
 // ExpectPreparingWithoutWorkersRolloutStatus is called while waiting for the PreparingWithoutWorkersRollout status.
-func (v *ShootAccessVerifier) ExpectPreparingWithoutWorkersRolloutStatus(_ Gomega) {}
+func (v *ShootAccessVerifier) ExpectPreparingWithoutWorkersRolloutStatus() {}
 
 // ExpectWaitingForWorkersRolloutStatus is called while waiting for the WaitingForWorkersRollout status.
-func (v *ShootAccessVerifier) ExpectWaitingForWorkersRolloutStatus(_ Gomega) {}
+func (v *ShootAccessVerifier) ExpectWaitingForWorkersRolloutStatus() {}
 
 // AfterPrepared is called when the Shoot is in Prepared status.
 func (v *ShootAccessVerifier) AfterPrepared() {
@@ -156,7 +156,7 @@ func (v *ShootAccessVerifier) AfterPrepared() {
 }
 
 // ExpectCompletingStatus is called while waiting for the Completing status.
-func (v *ShootAccessVerifier) ExpectCompletingStatus(_ Gomega) {}
+func (v *ShootAccessVerifier) ExpectCompletingStatus() {}
 
 // AfterCompleted is called when the Shoot is in Completed status.
 func (v *ShootAccessVerifier) AfterCompleted() {
